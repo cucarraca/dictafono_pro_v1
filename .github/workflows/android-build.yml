@@ -5,24 +5,63 @@ on:
     branches: [ main, master ]
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      JAVA_VERSION: '17'
+      NODE_VERSION: '18'
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'gradle'
+
       - name: Install Cordova CLI
         run: npm install -g cordova@12
+
       - name: Install dependencies
         run: npm install
+
       - name: Build APK (release unsigned)
         run: npm run build:cordova
+
+      - name: (Optional) Sign APK
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_ALIAS_PASSWORD: ${{ secrets.KEY_ALIAS_PASSWORD }}
+        run: |
+          echo "Decodificando keystore"
+          echo "$KEYSTORE_BASE64" | base64 -d > dictafono.keystore
+          UNSIGNED_APK=$(ls platforms/android/app/build/outputs/apk/release/*-unsigned.apk | head -n1)
+          if [ -z "$UNSIGNED_APK" ]; then echo "No se encontró APK unsigned"; exit 1; fi
+          echo "Firmando $UNSIGNED_APK"
+          $ANDROID_HOME/build-tools/*/apksigner sign --ks dictafono.keystore --ks-key-alias "$KEY_ALIAS" --ks-pass pass:"$KEYSTORE_PASSWORD" --key-pass pass:"$KEY_ALIAS_PASSWORD" --out app-signed.apk "$UNSIGNED_APK"
+          $ANDROID_HOME/build-tools/*/apksigner verify app-signed.apk
+          mv app-signed.apk platforms/android/app/build/outputs/apk/release/app-release-signed.apk
+
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dictafono-apk
-          path: platforms/android/app/build/outputs/apk/release/*.apk
+          path: |
+            platforms/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
