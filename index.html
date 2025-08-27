@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dictafono - Voz a Texto</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4CAF50">
+</head>
+<body>
+    <div class="app-container">
+        <div class="panel-shell">
+        <div class="top-bar">
+            <div class="controls-row" role="toolbar" aria-label="Controles de dictado">
+                <button id="playBtn" class="control-btn primary" aria-label="Iniciar dictado" data-tip="Iniciar dictado">▶️</button>
+                <button id="stopBtn" class="control-btn secondary" aria-label="Detener dictado" data-tip="Detener dictado" disabled>⏹️</button>
+                <button id="copyBtn" class="control-btn action" aria-label="Copiar texto" data-tip="Copiar texto">📋</button>
+                <button id="emojiBtn" class="control-btn emoji" aria-label="Emojis" data-tip="Insertar emoji">😀</button>
+                <button id="clearBtn" class="control-btn danger" aria-label="Borrar texto" data-tip="Borrar texto">🗑️</button>
+                <button id="archiveBtn" class="control-btn success" aria-label="Archivar texto" data-tip="Archivar texto">📦</button>
+                <button id="loadFileBtn" class="control-btn action" aria-label="Cargar archivo" data-tip="Cargar archivo">📂</button>
+                <button id="languageToolBtn" class="control-btn info" aria-label="Corregir con LanguageTool" data-tip="Corregir con LanguageTool">🛠️</button>
+                <button id="themeBtn" class="control-btn action" aria-label="Cambiar tema" data-tip="Cambiar tema">🎨</button>
+                <button id="buttonThemeBtn" class="control-btn action" aria-label="Cambiar estilo de botones" data-tip="Tema de botones">🧪</button>
+                <button id="fontStyleBtn" class="control-btn action" aria-label="Cambiar estilo de texto" data-tip="Fuente / tamaño / color">🅰️</button>
+                <div class="status-panel inline" aria-live="polite">
+                    <div class="status-icon"><span id="statusIcon">🎤</span></div>
+                    <div class="status-text" id="statusText">Listo para escuchar</div>
+                </div>
+                <div class="word-count" id="wordCount" aria-live="polite">0 palabras</div>
+            </div>
+        </div>
+    <div class="editor-wrapper">
+            <div class="editor-stack">
+                <textarea 
+                    id="textOutput" 
+                    class="text-output" 
+                    placeholder="Presiona Play para comenzar a dictar..."
+                ></textarea>
+            </div>
+        </div>
+    <div id="toast" class="toast"></div>
+    </div><!-- /panel-shell -->
+    </div>
+
+    <script>
+    (function(){
+        const tooltip=document.createElement('div');
+        tooltip.className='app-tooltip';
+        document.body.appendChild(tooltip);
+        const SHOW_DELAY=140,HIDE_DELAY=160; // ms
+        let showTO=null, hideTO=null, currentBtn=null;
+
+        function positionTooltip(btn){
+            const rect=btn.getBoundingClientRect();
+            const tipRect=tooltip.getBoundingClientRect();
+            let top=rect.top - tipRect.height - 10 + window.scrollY;
+            let placeBelow=false;
+            if(top < window.scrollY + 4){
+                top = rect.bottom + 10 + window.scrollY;
+                placeBelow=true;
+            }
+            let left=rect.left + rect.width/2 - tipRect.width/2 + window.scrollX;
+            left = Math.max(8, Math.min(left, window.innerWidth - tipRect.width - 8));
+            tooltip.style.top=top+"px"; tooltip.style.left=left+"px";
+            tooltip.setAttribute('data-pos', placeBelow? 'below':'above');
+        }
+
+        function showNow(btn){
+            const text=btn.getAttribute('data-tip'); if(!text) return;
+            tooltip.textContent=text;
+            tooltip.classList.add('show');
+            positionTooltip(btn);
+        }
+
+        function scheduleShow(btn){
+            if(currentBtn===btn && tooltip.classList.contains('show')) return;
+            clearTimeout(showTO); clearTimeout(hideTO);
+            showTO=setTimeout(()=>{ currentBtn=btn; showNow(btn); }, SHOW_DELAY);
+        }
+        function scheduleHide(btn){
+            if(currentBtn!==btn) return;
+            clearTimeout(showTO); clearTimeout(hideTO);
+            hideTO=setTimeout(()=>{ tooltip.classList.remove('show'); currentBtn=null; }, HIDE_DELAY);
+        }
+
+        function cancelHide(){ clearTimeout(hideTO); }
+
+        const buttons=[...document.querySelectorAll('.control-btn[data-tip]')];
+        buttons.forEach(btn=>{
+            btn.addEventListener('pointerenter',()=>scheduleShow(btn));
+            btn.addEventListener('pointerleave',()=>scheduleHide(btn));
+            btn.addEventListener('pointermove',()=>{ if(currentBtn===btn && tooltip.classList.contains('show')) positionTooltip(btn); });
+            btn.addEventListener('focus',()=>{cancelHide(); showNow(btn); currentBtn=btn;});
+            btn.addEventListener('blur',()=>scheduleHide(btn));
+        });
+        window.addEventListener('scroll',()=>{ if(currentBtn) positionTooltip(currentBtn); },{passive:true});
+        window.addEventListener('resize',()=>{ if(currentBtn) positionTooltip(currentBtn); });
+        document.addEventListener('mousedown',()=>{ if(currentBtn){ tooltip.classList.remove('show'); currentBtn=null; }});
+        window.addEventListener('blur',()=>{ if(currentBtn){ tooltip.classList.remove('show'); currentBtn=null; }});
+    })();
+    </script>
+    <script src="script_limpio.js"></script>
+</body>
+</html>
